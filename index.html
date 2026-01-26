@@ -2,7 +2,7 @@
 <html lang="no">
 <head>
     <meta charset="UTF-8">
-    <title>Enkelt bilspill</title>
+    <title>Bilspill i by</title>
     <style>
         body {
             margin: 0;
@@ -16,7 +16,7 @@
         }
 
         canvas {
-            background: #444;
+            background: #222;
             border: 3px solid #fff;
         }
 
@@ -30,18 +30,18 @@
 </head>
 <body>
 <div id="info">Styr bilen med piltastene ← ↑ → ↓</div>
-<canvas id="game" width="600" height="400"></canvas>
+<canvas id="game" width="800" height="600"></canvas>
 
 <script>
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
 
     const car = {
-        x: canvas.width / 2,
-        y: canvas.height / 2,
+        x: 150,
+        y: 500,
         width: 40,
         height: 20,
-        angle: 0,
+        angle: -Math.PI / 2,
         speed: 0,
         maxSpeed: 4,
         accel: 0.15,
@@ -56,6 +56,19 @@
         ArrowRight: false
     };
 
+    // Enkle bygninger (rektangler utenfor veiene)
+    const buildings = [
+        { x: 50,  y: 50,  w: 200, h: 150 },
+        { x: 300, y: 60,  w: 180, h: 130 },
+        { x: 540, y: 70,  w: 200, h: 140 },
+        { x: 60,  y: 260, w: 200, h: 140 },
+        { x: 320, y: 260, w: 160, h: 160 },
+        { x: 560, y: 260, w: 190, h: 150 },
+        { x: 60,  y: 450, w: 200, h: 110 },
+        { x: 320, y: 460, w: 160, h: 120 },
+        { x: 560, y: 460, w: 190, h: 110 }
+    ];
+
     document.addEventListener("keydown", (e) => {
         if (keys.hasOwnProperty(e.key)) {
             keys[e.key] = true;
@@ -68,7 +81,18 @@
         }
     });
 
+    function rectsOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
+        return ax < bx + bw &&
+               ax + aw > bx &&
+               ay < by + bh &&
+               ay + ah > by;
+    }
+
     function update() {
+        const prevX = car.x;
+        const prevY = car.y;
+        const prevAngle = car.angle;
+
         // Akselerasjon
         if (keys.ArrowUp) {
             car.speed += car.accel;
@@ -106,11 +130,81 @@
         car.x += Math.cos(car.angle) * car.speed;
         car.y += Math.sin(car.angle) * car.speed;
 
-        // Hold bilen inne på banen
+        // Hold innenfor canvas
         if (car.x < 0) car.x = 0;
         if (car.x > canvas.width) car.x = canvas.width;
         if (car.y < 0) car.y = 0;
         if (car.y > canvas.height) car.y = canvas.height;
+
+        // Enkel kollisjon: sjekk bilens bounding box mot bygninger
+        const carBox = {
+            x: car.x - car.width / 2,
+            y: car.y - car.height / 2,
+            w: car.width,
+            h: car.height
+        };
+
+        for (const b of buildings) {
+            if (rectsOverlap(carBox.x, carBox.y, carBox.w, carBox.h, b.x, b.y, b.w, b.h)) {
+                // Tilbake til forrige posisjon hvis krasj
+                car.x = prevX;
+                car.y = prevY;
+                car.angle = prevAngle;
+                car.speed = 0;
+                break;
+            }
+        }
+    }
+
+    function drawCity() {
+        // Bakgrunn
+        ctx.fillStyle = "#222";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Veier (horisontale og vertikale)
+        ctx.fillStyle = "#555";
+        // Horisontale veier
+        ctx.fillRect(0, 200, canvas.width, 80);
+        ctx.fillRect(0, 400, canvas.width, 80);
+        // Vertikale veier
+        ctx.fillRect(250, 0, 80, canvas.height);
+        ctx.fillRect(500, 0, 80, canvas.height);
+
+        // Midtstriper
+        ctx.strokeStyle = "#ddd";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([10, 10]);
+
+        // Horisontale midtstriper
+        ctx.beginPath();
+        ctx.moveTo(0, 240);
+        ctx.lineTo(canvas.width, 240);
+        ctx.moveTo(0, 440);
+        ctx.lineTo(canvas.width, 440);
+        ctx.stroke();
+
+        // Vertikale midtstriper
+        ctx.beginPath();
+        ctx.moveTo(290, 0);
+        ctx.lineTo(290, canvas.height);
+        ctx.moveTo(540, 0);
+        ctx.lineTo(540, canvas.height);
+        ctx.stroke();
+
+        ctx.setLineDash([]);
+
+        // Bygninger
+        for (const b of buildings) {
+            ctx.fillStyle = "#2b3b55";
+            ctx.fillRect(b.x, b.y, b.w, b.h);
+
+            ctx.fillStyle = "#f0f0f0";
+            for (let i = 0; i < b.w; i += 30) {
+                for (let j = 0; j < b.h; j += 30) {
+                    ctx.fillRect(b.x + 5 + i, b.y + 5 + j, 10, 10);
+                }
+            }
+        }
     }
 
     function drawCar() {
@@ -122,29 +216,17 @@
         ctx.fillStyle = "red";
         ctx.fillRect(-car.width / 2, -car.height / 2, car.width, car.height);
 
-        // Frontmarkering
+        // Front
         ctx.fillStyle = "yellow";
         ctx.fillRect(car.width / 2 - 5, -car.height / 4, 5, car.height / 2);
 
         ctx.restore();
     }
 
-    function drawTrack() {
-        ctx.fillStyle = "#333";
-        ctx.fillRect(50, 50, canvas.width - 100, canvas.height - 100);
-
-        ctx.strokeStyle = "#888";
-        ctx.lineWidth = 4;
-        ctx.strokeRect(50, 50, canvas.width - 100, canvas.height - 100);
-    }
-
     function loop() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        drawTrack();
+        drawCity();
         update();
         drawCar();
-
         requestAnimationFrame(loop);
     }
 
