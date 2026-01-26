@@ -2,7 +2,7 @@
 <html lang="no">
 <head>
     <meta charset="UTF-8">
-    <title>3D bilspill – ny versjon</title>
+    <title>3D BMW M4 Bilspill</title>
     <style>
         body {
             margin: 0;
@@ -16,6 +16,7 @@
             left: 10px;
             color: #fff;
             z-index: 10;
+            font-size: 18px;
         }
     </style>
 </head>
@@ -25,175 +26,173 @@
 <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
 
 <script>
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x202030);
+// SCENE
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x202030);
 
-    const camera = new THREE.PerspectiveCamera(
-        60,
-        window.innerWidth / window.innerHeight,
-        0.1,
-        1000
+// KAMERA
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+
+// RENDERER
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+// LYS
+const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+scene.add(ambient);
+
+const sun = new THREE.DirectionalLight(0xffffff, 1);
+sun.position.set(100, 200, 100);
+sun.castShadow = true;
+scene.add(sun);
+
+// BAKKE
+const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(2000, 2000),
+    new THREE.MeshPhongMaterial({ color: 0x404040 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// BYGNINGER
+function addBuilding(x, z, w, h, d) {
+    const b = new THREE.Mesh(
+        new THREE.BoxGeometry(w, h, d),
+        new THREE.MeshPhongMaterial({ color: 0x223355 })
     );
+    b.position.set(x, h / 2, z);
+    b.castShadow = true;
+    b.receiveShadow = true;
+    scene.add(b);
+}
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+addBuilding(-200, -200, 80, 120, 80);
+addBuilding(200, -150, 100, 150, 100);
+addBuilding(-150, 200, 120, 100, 120);
+addBuilding(150, 250, 140, 160, 140);
+
+// BMW‑AKTIG BIL
+const car = new THREE.Group();
+
+// Karosseri
+const body = new THREE.Mesh(
+    new THREE.BoxGeometry(6, 1.2, 3),
+    new THREE.MeshPhongMaterial({ color: 0x0077ff, shininess: 200 })
+);
+body.castShadow = true;
+car.add(body);
+
+// Tak
+const cabin = new THREE.Mesh(
+    new THREE.BoxGeometry(3.2, 0.7, 2.4),
+    new THREE.MeshPhongMaterial({ color: 0xffffff, opacity: 0.7, transparent: true })
+);
+cabin.position.set(0, 1.0, -0.2);
+cabin.castShadow = true;
+car.add(cabin);
+
+// HJUL
+function createWheel() {
+    const w = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.6, 0.6, 0.5, 20),
+        new THREE.MeshPhongMaterial({ color: 0x111111 })
+    );
+    w.rotation.z = Math.PI / 2;
+    w.castShadow = true;
+    return w;
+}
+
+const wheelFL = createWheel();
+const wheelFR = createWheel();
+const wheelBL = createWheel();
+const wheelBR = createWheel();
+
+wheelFL.position.set(-2, -0.1, 1.4);
+wheelFR.position.set(2, -0.1, 1.4);
+wheelBL.position.set(-2, -0.1, -1.4);
+wheelBR.position.set(2, -0.1, -1.4);
+
+car.add(wheelFL, wheelFR, wheelBL, wheelBR);
+
+car.position.set(0, 1, 0);
+scene.add(car);
+
+// INPUT
+const keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+document.addEventListener("keydown", e => keys[e.key] = true);
+document.addEventListener("keyup", e => keys[e.key] = false);
+
+// BILFYSIKK
+let speed = 0;
+const maxSpeed = 2.5;
+const accel = 0.06;
+const friction = 0.02;
+const turnSpeed = 0.04;
+
+function updateCar() {
+    // Akselerasjon
+    if (keys.ArrowUp) speed += accel;
+    if (keys.ArrowDown) speed -= accel;
+
+    // Begrens fart
+    speed = Math.max(Math.min(speed, maxSpeed), -maxSpeed / 2);
+
+    // Friksjon
+    if (!keys.ArrowUp && !keys.ArrowDown) {
+        if (speed > 0) speed -= friction;
+        if (speed < 0) speed += friction;
+        if (Math.abs(speed) < 0.01) speed = 0;
+    }
+
+    // Svinging
+    if (speed !== 0) {
+        if (keys.ArrowLeft) car.rotation.y += turnSpeed * (speed / maxSpeed);
+        if (keys.ArrowRight) car.rotation.y -= turnSpeed * (speed / maxSpeed);
+    }
+
+    // Bevegelse (ingen sidelengs glidning)
+    const forward = new THREE.Vector3();
+    car.getWorldDirection(forward);
+    car.position.addScaledVector(forward, speed);
+
+    // Hjulrotasjon
+    const wheelSpin = speed * 5;
+    wheelFL.rotation.x -= wheelSpin;
+    wheelFR.rotation.x -= wheelSpin;
+    wheelBL.rotation.x -= wheelSpin;
+    wheelBR.rotation.x -= wheelSpin;
+}
+
+// KAMERA
+function updateCamera() {
+    const offset = new THREE.Vector3(0, 5, 12);
+    offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), car.rotation.y);
+
+    const camPos = car.position.clone().add(offset);
+    camera.position.lerp(camPos, 0.1);
+    camera.lookAt(car.position.clone().add(new THREE.Vector3(0, 1, 0)));
+}
+
+// LOOP
+function animate() {
+    requestAnimationFrame(animate);
+    updateCar();
+    updateCamera();
+    renderer.render(scene, camera);
+}
+
+animate();
+
+// Resize
+window.addEventListener("resize", () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    document.body.appendChild(renderer.domElement);
-
-    // Lys
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
-    scene.add(ambientLight);
-
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
-    dirLight.position.set(60, 120, 40);
-    dirLight.castShadow = true;
-    scene.add(dirLight);
-
-    // Bakke
-    const groundGeo = new THREE.PlaneGeometry(500, 500);
-    const groundMat = new THREE.MeshPhongMaterial({ color: 0x404040 });
-    const ground = new THREE.Mesh(groundGeo, groundMat);
-    ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = true;
-    scene.add(ground);
-
-    // Enkle bygninger
-    const buildingMat = new THREE.MeshPhongMaterial({ color: 0x223355 });
-    function addBuilding(x, z, w, h, d) {
-        const geo = new THREE.BoxGeometry(w, h, d);
-        const mesh = new THREE.Mesh(geo, buildingMat);
-        mesh.position.set(x, h / 2, z);
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        scene.add(mesh);
-    }
-
-    addBuilding(-80, -80, 40, 60, 40);
-    addBuilding(60, -100, 50, 80, 50);
-    addBuilding(-120, 40, 60, 70, 40);
-    addBuilding(100, 80, 70, 90, 50);
-    addBuilding(0, 140, 80, 60, 60);
-
-    // Veier
-    const roadMat = new THREE.MeshPhongMaterial({ color: 0x303030 });
-    function addRoad(x, z, w, d) {
-        const geo = new THREE.BoxGeometry(w, 0.1, d);
-        const mesh = new THREE.Mesh(geo, roadMat);
-        mesh.position.set(x, 0.05, z);
-        mesh.receiveShadow = true;
-        scene.add(mesh);
-    }
-
-    addRoad(0, 0, 40, 400);
-    addRoad(-100, 0, 40, 300);
-    addRoad(100, 0, 40, 300);
-    addRoad(0, 100, 200, 40);
-    addRoad(0, -100, 200, 40);
-
-    // Bil – sportsbil-look
-    const carBodyGeo = new THREE.BoxGeometry(5, 1, 2.6);
-    const carBodyMat = new THREE.MeshPhongMaterial({ color: 0x00aaff, shininess: 150 });
-    const car = new THREE.Mesh(carBodyGeo, carBodyMat);
-    car.position.set(0, 0.5, 0);
-    car.castShadow = true;
-    scene.add(car);
-
-    const cabinGeo = new THREE.BoxGeometry(2.8, 0.6, 2);
-    const cabinMat = new THREE.MeshPhongMaterial({
-        color: 0xffffff,
-        opacity: 0.8,
-        transparent: true
-    });
-    const cabin = new THREE.Mesh(cabinGeo, cabinMat);
-    cabin.position.set(0, 0.9, -0.1);
-    cabin.castShadow = true;
-    car.add(cabin);
-
-    // Kamera
-    camera.position.set(0, 6, 12);
-    camera.lookAt(car.position);
-
-    // Input
-    const keys = {
-        ArrowUp: false,
-        ArrowDown: false,
-        ArrowLeft: false,
-        ArrowRight: false
-    };
-
-    document.addEventListener("keydown", (e) => {
-        if (keys.hasOwnProperty(e.key)) keys[e.key] = true;
-    });
-
-    document.addEventListener("keyup", (e) => {
-        if (keys.hasOwnProperty(e.key)) keys[e.key] = false;
-    });
-
-    // Bilfysikk
-    let speed = 0;
-    const maxSpeed = 1.5;
-    const accel = 0.04;
-    const friction = 0.01;
-    const turnSpeed = 0.05;
-
-    function updateCar() {
-        if (keys.ArrowUp) speed += accel;
-        if (keys.ArrowDown) speed -= accel;
-
-        if (speed > maxSpeed) speed = maxSpeed;
-        if (speed < -maxSpeed / 2) speed = -maxSpeed / 2;
-
-        if (!keys.ArrowUp && !keys.ArrowDown) {
-            if (speed > 0) {
-                speed -= friction;
-                if (speed < 0) speed = 0;
-            } else if (speed < 0) {
-                speed += friction;
-                if (speed > 0) speed = 0;
-            }
-        }
-
-        if (speed !== 0) {
-            if (keys.ArrowLeft) {
-                car.rotation.y += turnSpeed * (speed > 0 ? 1 : -1);
-            }
-            if (keys.ArrowRight) {
-                car.rotation.y -= turnSpeed * (speed > 0 ? 1 : -1);
-            }
-        }
-
-        const dir = new THREE.Vector3();
-        car.getWorldDirection(dir);
-        car.position.addScaledVector(dir, speed);
-    }
-
-    function updateCamera() {
-        const offset = new THREE.Vector3(0, 4, 10);
-        const rotatedOffset = offset.clone().applyAxisAngle(
-            new THREE.Vector3(0, 1, 0),
-            car.rotation.y
-        );
-
-        const targetPos = car.position.clone().add(rotatedOffset);
-        camera.position.lerp(targetPos, 0.12);
-        camera.lookAt(car.position.clone().add(new THREE.Vector3(0, 1, 0)));
-    }
-
-    function animate() {
-        requestAnimationFrame(animate);
-        updateCar();
-        updateCamera();
-        renderer.render(scene, camera);
-    }
-
-    animate();
-
-    window.addEventListener("resize", () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    });
+});
 </script>
+
 </body>
 </html>
