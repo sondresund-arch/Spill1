@@ -1,0 +1,51 @@
+using UnityEngine;
+
+public class CarController : MonoBehaviour
+{
+    public float motorForce = 800f;
+    public float maxSteerAngle = 30f;
+    public float brakeForce = 1000f;
+
+    private float currentSteer;
+    private float currentMotor;
+    private float currentBrake;
+
+    private Rigidbody rb;
+
+    void Start()
+    {
+        rb = GetComponent<Rigidbody>();
+    }
+
+    void Update()
+    {
+        float v = Input.GetAxis("Vertical");   // W/S eller piltaster
+        float h = Input.GetAxis("Horizontal"); // A/D eller piltaster
+
+        currentMotor = v * motorForce;
+        currentSteer = h * maxSteerAngle;
+
+        // Brems med Space
+        if (Input.GetKey(KeyCode.Space))
+            currentBrake = brakeForce;
+        else
+            currentBrake = 0f;
+    }
+
+    void FixedUpdate()
+    {
+        // Fremoverkraft
+        rb.AddForce(transform.forward * currentMotor * Time.fixedDeltaTime);
+
+        // Styring
+        Quaternion turnOffset = Quaternion.Euler(0f, currentSteer * Time.fixedDeltaTime, 0f);
+        rb.MoveRotation(rb.rotation * turnOffset);
+
+        // Brems (enkel løsning: motkraft)
+        if (currentBrake > 0f)
+        {
+            Vector3 vel = rb.velocity;
+            rb.AddForce(-vel.normalized * currentBrake * Time.fixedDeltaTime);
+        }
+    }
+}
