@@ -1,51 +1,40 @@
 using UnityEngine;
 
-public class CarController : MonoBehaviour
+public class CarGame : MonoBehaviour
 {
-    public float motorForce = 800f;
-    public float maxSteerAngle = 30f;
-    public float brakeForce = 1000f;
+    // Bil
+    public float speed = 12f;
+    public float turnSpeed = 80f;
 
-    private float currentSteer;
-    private float currentMotor;
-    private float currentBrake;
-
-    private Rigidbody rb;
-
-    void Start()
-    {
-        rb = GetComponent<Rigidbody>();
-    }
+    // Kamera
+    public Transform cameraTransform;
+    public Vector3 cameraOffset = new Vector3(0, 3, -7);
+    public float cameraSmooth = 5f;
 
     void Update()
     {
-        float v = Input.GetAxis("Vertical");   // W/S eller piltaster
-        float h = Input.GetAxis("Horizontal"); // A/D eller piltaster
+        // --- BILKONTROLL ---
+        float v = Input.GetAxis("Vertical");   // W/S
+        float h = Input.GetAxis("Horizontal"); // A/D
 
-        currentMotor = v * motorForce;
-        currentSteer = h * maxSteerAngle;
+        // Fremover/bakover
+        transform.position += transform.forward * v * speed * Time.deltaTime;
 
-        // Brems med Space
-        if (Input.GetKey(KeyCode.Space))
-            currentBrake = brakeForce;
-        else
-            currentBrake = 0f;
-    }
+        // Svinge
+        transform.Rotate(0f, h * turnSpeed * Time.deltaTime, 0f);
 
-    void FixedUpdate()
-    {
-        // Fremoverkraft
-        rb.AddForce(transform.forward * currentMotor * Time.fixedDeltaTime);
-
-        // Styring
-        Quaternion turnOffset = Quaternion.Euler(0f, currentSteer * Time.fixedDeltaTime, 0f);
-        rb.MoveRotation(rb.rotation * turnOffset);
-
-        // Brems (enkel løsning: motkraft)
-        if (currentBrake > 0f)
+        // --- KAMERA-FØLGER ---
+        if (cameraTransform != null)
         {
-            Vector3 vel = rb.velocity;
-            rb.AddForce(-vel.normalized * currentBrake * Time.fixedDeltaTime);
+            Vector3 targetPos = transform.position + transform.TransformDirection(cameraOffset);
+
+            cameraTransform.position = Vector3.Lerp(
+                cameraTransform.position,
+                targetPos,
+                cameraSmooth * Time.deltaTime
+            );
+
+            cameraTransform.LookAt(transform.position + Vector3.up * 1.5f);
         }
     }
 }
