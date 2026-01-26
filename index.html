@@ -1,40 +1,154 @@
-using UnityEngine;
-
-public class CarGame : MonoBehaviour
-{
-    // Bil
-    public float speed = 12f;
-    public float turnSpeed = 80f;
-
-    // Kamera
-    public Transform cameraTransform;
-    public Vector3 cameraOffset = new Vector3(0, 3, -7);
-    public float cameraSmooth = 5f;
-
-    void Update()
-    {
-        // --- BILKONTROLL ---
-        float v = Input.GetAxis("Vertical");   // W/S
-        float h = Input.GetAxis("Horizontal"); // A/D
-
-        // Fremover/bakover
-        transform.position += transform.forward * v * speed * Time.deltaTime;
-
-        // Svinge
-        transform.Rotate(0f, h * turnSpeed * Time.deltaTime, 0f);
-
-        // --- KAMERA-FØLGER ---
-        if (cameraTransform != null)
-        {
-            Vector3 targetPos = transform.position + transform.TransformDirection(cameraOffset);
-
-            cameraTransform.position = Vector3.Lerp(
-                cameraTransform.position,
-                targetPos,
-                cameraSmooth * Time.deltaTime
-            );
-
-            cameraTransform.LookAt(transform.position + Vector3.up * 1.5f);
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <title>Enkelt bilspill</title>
+    <style>
+        body {
+            margin: 0;
+            background: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: white;
+            font-family: Arial, sans-serif;
         }
+
+        canvas {
+            background: #444;
+            border: 3px solid #fff;
+        }
+
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+<div id="info">Styr bilen med piltastene ← ↑ → ↓</div>
+<canvas id="game" width="600" height="400"></canvas>
+
+<script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+
+    const car = {
+        x: canvas.width / 2,
+        y: canvas.height / 2,
+        width: 40,
+        height: 20,
+        angle: 0,
+        speed: 0,
+        maxSpeed: 4,
+        accel: 0.15,
+        friction: 0.05,
+        turnSpeed: 0.05
+    };
+
+    const keys = {
+        ArrowUp: false,
+        ArrowDown: false,
+        ArrowLeft: false,
+        ArrowRight: false
+    };
+
+    document.addEventListener("keydown", (e) => {
+        if (keys.hasOwnProperty(e.key)) {
+            keys[e.key] = true;
+        }
+    });
+
+    document.addEventListener("keyup", (e) => {
+        if (keys.hasOwnProperty(e.key)) {
+            keys[e.key] = false;
+        }
+    });
+
+    function update() {
+        // Akselerasjon
+        if (keys.ArrowUp) {
+            car.speed += car.accel;
+        }
+        if (keys.ArrowDown) {
+            car.speed -= car.accel;
+        }
+
+        // Begrens fart
+        if (car.speed > car.maxSpeed) car.speed = car.maxSpeed;
+        if (car.speed < -car.maxSpeed / 2) car.speed = -car.maxSpeed / 2;
+
+        // Friksjon
+        if (!keys.ArrowUp && !keys.ArrowDown) {
+            if (car.speed > 0) {
+                car.speed -= car.friction;
+                if (car.speed < 0) car.speed = 0;
+            } else if (car.speed < 0) {
+                car.speed += car.friction;
+                if (car.speed > 0) car.speed = 0;
+            }
+        }
+
+        // Svinging
+        if (car.speed !== 0) {
+            if (keys.ArrowLeft) {
+                car.angle -= car.turnSpeed * (car.speed > 0 ? 1 : -1);
+            }
+            if (keys.ArrowRight) {
+                car.angle += car.turnSpeed * (car.speed > 0 ? 1 : -1);
+            }
+        }
+
+        // Bevegelse
+        car.x += Math.cos(car.angle) * car.speed;
+        car.y += Math.sin(car.angle) * car.speed;
+
+        // Hold bilen inne på banen
+        if (car.x < 0) car.x = 0;
+        if (car.x > canvas.width) car.x = canvas.width;
+        if (car.y < 0) car.y = 0;
+        if (car.y > canvas.height) car.y = canvas.height;
     }
-}
+
+    function drawCar() {
+        ctx.save();
+        ctx.translate(car.x, car.y);
+        ctx.rotate(car.angle);
+
+        // Bilkropp
+        ctx.fillStyle = "red";
+        ctx.fillRect(-car.width / 2, -car.height / 2, car.width, car.height);
+
+        // Frontmarkering
+        ctx.fillStyle = "yellow";
+        ctx.fillRect(car.width / 2 - 5, -car.height / 4, 5, car.height / 2);
+
+        ctx.restore();
+    }
+
+    function drawTrack() {
+        ctx.fillStyle = "#333";
+        ctx.fillRect(50, 50, canvas.width - 100, canvas.height - 100);
+
+        ctx.strokeStyle = "#888";
+        ctx.lineWidth = 4;
+        ctx.strokeRect(50, 50, canvas.width - 100, canvas.height - 100);
+    }
+
+    function loop() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        drawTrack();
+        update();
+        drawCar();
+
+        requestAnimationFrame(loop);
+    }
+
+    loop();
+</script>
+</body>
+</html>
