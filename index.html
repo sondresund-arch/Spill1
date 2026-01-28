@@ -2,28 +2,35 @@
 <html lang="no">
 <head>
 <meta charset="UTF-8">
-<title>Flappy Bird – Ny versjon</title>
+<title>Flappy Bird – Fullskjerm</title>
 <style>
 body {
    margin: 0;
    background: #222;
-   display: flex;
-   justify-content: center;
-   align-items: center;
+   overflow: hidden; /* Skjuler rullefelt */
    height: 100vh;
-   overflow: hidden; /* Skjuler rullefelt helt */
+   width: 100vw;
 }
 canvas {
-   border: 3px solid #000;
+   display: block; /* Fjerner ekstra mellomrom */
    background: linear-gradient(#6ec9ff, #b3ecff);
 }
 </style>
 </head>
 <body>
-<canvas id="game" width="420" height="640"></canvas>
+<canvas id="game"></canvas>
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
+ 
+// Funksjon for å sette fullskjerm
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+// Kjør resize med en gang, og hver gang vinduet endres
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
  
 // Fuglen
 let bird = {
@@ -32,14 +39,14 @@ y: canvas.height / 2,
 r: 18,
 vel: 0,
 gravity: 0.45,
-jump: -4.25 // halvparten av originalen
+jump: -5.31 // Økt med 25% (fra -4.25)
 };
  
 // Rør
 let pipes = [];
-let pipeGap = 150;
-let pipeWidth = 70;
-let pipeSpeed = 3;
+let pipeGap = 170; // Økte gapet litt siden skjermen er større
+let pipeWidth = 80;
+let pipeSpeed = 3.5; // Litt raskere fart for fullskjerm
  
 // Spillstatus
 let score = 0;
@@ -58,9 +65,15 @@ gameOver = false;
 paused = false;
 }
  
-// Lag rør
+// Lag rør (tilpasset skjermhøyde)
 function addPipe() {
-let top = 40 + Math.random() * 260;
+// Beregn trygg sone for rør slik at de ikke havner inni bakken eller taket
+let minHeight = 50;
+let maxHeight = canvas.height - 60 - pipeGap - minHeight; // 60 er bakkehøyde
+
+// Tilfeldig plassering innenfor trygg sone
+let top = minHeight + Math.random() * (maxHeight - minHeight);
+ 
 pipes.push({
    x: canvas.width,
    top: top,
@@ -78,7 +91,9 @@ bird.vel += bird.gravity;
 bird.y += bird.vel;
 frame++;
  
-if (frame % 90 === 0) addPipe();
+// Legg til rør litt oftere eller sjeldnere basert på skjermbredde
+// Her bruker vi en enkel frame-teller
+if (frame % 100 === 0) addPipe();
  
 // Oppdater rør
 for (let i = pipes.length - 1; i >= 0; i--) {
@@ -93,7 +108,7 @@ for (let i = pipes.length - 1; i >= 0; i--) {
 }
  
 // Kollisjon med bakken/tak
-if (bird.y + bird.r > canvas.height || bird.y - bird.r < 0) {
+if (bird.y + bird.r > canvas.height - 60 || bird.y - bird.r < 0) { // -60 for å treffe bakken, ikke bunn av skjerm
    gameOver = true;
 }
  
@@ -126,12 +141,12 @@ ctx.fill();
 function drawPipes() {
 for (let p of pipes) {
    ctx.fillStyle = "#2ecc71";
-   ctx.fillRect(p.x, 0, pipeWidth, p.top);
-   ctx.fillRect(p.x, p.bottom, pipeWidth, canvas.height - p.bottom);
+   ctx.fillRect(p.x, 0, pipeWidth, p.top); // Øvre rør
+   ctx.fillRect(p.x, p.bottom, pipeWidth, canvas.height - p.bottom - 60); // Nedre rør (stopper ved bakken)
  
    ctx.fillStyle = "rgba(0,0,0,0.2)";
-   ctx.fillRect(p.x + pipeWidth - 5, 0, 5, p.top);
-   ctx.fillRect(p.x + pipeWidth - 5, p.bottom, 5, canvas.height - p.bottom);
+   ctx.fillRect(p.x + pipeWidth - 10, 0, 10, p.top);
+   ctx.fillRect(p.x + pipeWidth - 10, p.bottom, 10, canvas.height - p.bottom - 60);
 }
 }
  
@@ -139,34 +154,52 @@ for (let p of pipes) {
 function drawBackground() {
 ctx.fillStyle = "#6ec9ff";
 ctx.fillRect(0, 0, canvas.width, canvas.height);
+ 
 ctx.fillStyle = "#d9c27a";
-ctx.fillRect(0, canvas.height - 60, canvas.width, 60);
+ctx.fillRect(0, canvas.height - 60, canvas.width, 60); // Sand
+ 
 ctx.fillStyle = "#4caf50";
-ctx.fillRect(0, canvas.height - 70, canvas.width, 10);
+ctx.fillRect(0, canvas.height - 70, canvas.width, 10); // Gress
 }
  
 // Tekst
 function drawText() {
 ctx.fillStyle = "#fff";
 ctx.font = "28px Arial";
-ctx.fillText("Score: " + score, 10, 40);
+ctx.fillText("Score: " + score, 20, 50);
  
 if (!started && !gameOver) {
-   ctx.font = "30px Arial";
-   ctx.fillText("Trykk SPACE for å starte", 40, canvas.height / 2);
+   ctx.fillStyle = "#000"; // Mørkere tekst for synlighet mot himmel
+   ctx.font = "40px Arial";
+   let text = "Trykk SPACE for å starte";
+   let textWidth = ctx.measureText(text).width;
+   ctx.fillText(text, (canvas.width - textWidth) / 2, canvas.height / 2);
 }
  
 if (paused) {
-   ctx.font = "40px Arial";
-   ctx.fillText("PAUSE", 150, canvas.height / 2);
+   ctx.fillStyle = "#fff";
+   ctx.font = "60px Arial";
+   let text = "PAUSE";
+   let textWidth = ctx.measureText(text).width;
+   ctx.fillText(text, (canvas.width - textWidth) / 2, canvas.height / 2);
 }
  
 if (gameOver) {
-   ctx.font = "40px Arial";
-   ctx.fillText("GAME OVER", 110, canvas.height / 2 - 20);
-   ctx.font = "24px Arial";
-   ctx.fillText("Score: " + score, 170, canvas.height / 2 + 20);
-   ctx.fillText("Trykk SPACE for å restarte", 80, canvas.height / 2 + 60);
+   ctx.fillStyle = "#000";
+   ctx.font = "50px Arial";
+   let t1 = "GAME OVER";
+   let t2 = "Score: " + score;
+   let t3 = "Trykk SPACE for å restarte";
+   
+   let w1 = ctx.measureText(t1).width;
+   ctx.fillText(t1, (canvas.width - w1) / 2, canvas.height / 2 - 40);
+   
+   ctx.font = "30px Arial";
+   let w2 = ctx.measureText(t2).width;
+   ctx.fillText(t2, (canvas.width - w2) / 2, canvas.height / 2 + 10);
+   
+   let w3 = ctx.measureText(t3).width;
+   ctx.fillText(t3, (canvas.width - w3) / 2, canvas.height / 2 + 60);
 }
 }
  
@@ -183,7 +216,7 @@ requestAnimationFrame(loop);
 // Kontroller
 document.addEventListener("keydown", (e) => {
 if (e.code === "Space") {
-   e.preventDefault(); // <-- HER ER FIKSEN: Stopper skjermen fra å hoppe
+   e.preventDefault(); // Hindrer hopping av skjerm
  
    if (!started) {
      started = true;
