@@ -1,198 +1,200 @@
 <!DOCTYPE html>
 <html lang="no">
 <head>
-    <meta charset="UTF-8">
-    <title>3D BMW M4 Bilspill</title>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background: #000;
-            font-family: Arial, sans-serif;
-        }
-        #info {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            color: #fff;
-            z-index: 10;
-            font-size: 18px;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <title>Enkelt 3D bilspill</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #000; }
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      background: rgba(0,0,0,0.5);
+      padding: 8px 10px;
+      border-radius: 4px;
+    }
+  </style>
 </head>
 <body>
-<div id="info">Styr bilen med piltastene ← ↑ → ↓</div>
+<div id="info">
+  Piltaster: styr bilen din<br>
+  Din bil: rask (ca. 200 km/t)<br>
+  Rød bil: saktere (ca. 100 km/t)
+</div>
 
+<!-- Three.js fra CDN -->
 <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
 
 <script>
-// SCENE
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x202030);
+  // Grunnleggende Three.js-oppsett
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x87ceeb); // himmelblå
 
-// KAMERA
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+  const camera = new THREE.PerspectiveCamera(
+    60,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000
+  );
+  camera.position.set(0, 10, -20);
+  camera.lookAt(0, 0, 0);
 
-// RENDERER
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
-document.body.appendChild(renderer.domElement);
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
 
-// LYS
-const ambient = new THREE.AmbientLight(0xffffff, 0.4);
-scene.add(ambient);
+  // Lys
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+  scene.add(ambientLight);
 
-const sun = new THREE.DirectionalLight(0xffffff, 1);
-sun.position.set(100, 200, 100);
-sun.castShadow = true;
-scene.add(sun);
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  dirLight.position.set(10, 20, 10);
+  scene.add(dirLight);
 
-// BAKKE
-const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(2000, 2000),
-    new THREE.MeshPhongMaterial({ color: 0x404040 })
-);
-ground.rotation.x = -Math.PI / 2;
-ground.receiveShadow = true;
-scene.add(ground);
+  // "By-gulv" (stor plane)
+  const groundGeo = new THREE.PlaneGeometry(500, 500);
+  const groundMat = new THREE.MeshPhongMaterial({ color: 0x444444 });
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI / 2;
+  scene.add(ground);
 
-// BYGNINGER
-function addBuilding(x, z, w, h, d) {
-    const b = new THREE.Mesh(
-        new THREE.BoxGeometry(w, h, d),
-        new THREE.MeshPhongMaterial({ color: 0x223355 })
-    );
-    b.position.set(x, h / 2, z);
-    b.castShadow = true;
-    b.receiveShadow = true;
-    scene.add(b);
-}
+  // Enkle "hus" som bokser
+  function createBuilding(x, z, h) {
+    const geo = new THREE.BoxGeometry(5, h, 5);
+    const mat = new THREE.MeshPhongMaterial({ color: 0x888888 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x, h / 2, z);
+    scene.add(mesh);
+  }
 
-addBuilding(-200, -200, 80, 120, 80);
-addBuilding(200, -150, 100, 150, 100);
-addBuilding(-150, 200, 120, 100, 120);
-addBuilding(150, 250, 140, 160, 140);
+  for (let i = 0; i < 40; i++) {
+    const x = (Math.random() - 0.5) * 400;
+    const z = (Math.random() - 0.5) * 400;
+    const h = 5 + Math.random() * 25;
+    createBuilding(x, z, h);
+  }
 
-// BMW‑AKTIG BIL
-const car = new THREE.Group();
+  // Din bil (blå boks)
+  const carGeo = new THREE.BoxGeometry(2, 1, 4);
+  const carMat = new THREE.MeshPhongMaterial({ color: 0x0000ff });
+  const playerCar = new THREE.Mesh(carGeo, carMat);
+  playerCar.position.set(0, 0.5, 0);
+  scene.add(playerCar);
 
-// Karosseri
-const body = new THREE.Mesh(
-    new THREE.BoxGeometry(6, 1.2, 3),
-    new THREE.MeshPhongMaterial({ color: 0x0077ff, shininess: 200 })
-);
-body.castShadow = true;
-car.add(body);
+  // Motstanderbil (rød boks)
+  const enemyMat = new THREE.MeshPhongMaterial({ color: 0xff0000 });
+  const enemyCar = new THREE.Mesh(carGeo, enemyMat);
+  enemyCar.position.set(3, 0.5, -10);
+  scene.add(enemyCar);
 
-// Tak
-const cabin = new THREE.Mesh(
-    new THREE.BoxGeometry(3.2, 0.7, 2.4),
-    new THREE.MeshPhongMaterial({ color: 0xffffff, opacity: 0.7, transparent: true })
-);
-cabin.position.set(0, 1.0, -0.2);
-cabin.castShadow = true;
-car.add(cabin);
+  // Kontrollvariabler
+  const keys = {
+    ArrowUp: false,
+    ArrowDown: false,
+    ArrowLeft: false,
+    ArrowRight: false
+  };
 
-// HJUL
-function createWheel() {
-    const w = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.6, 0.6, 0.5, 20),
-        new THREE.MeshPhongMaterial({ color: 0x111111 })
-    );
-    w.rotation.z = Math.PI / 2;
-    w.castShadow = true;
-    return w;
-}
+  window.addEventListener("keydown", (e) => {
+    if (keys.hasOwnProperty(e.key)) keys[e.key] = true;
+  });
 
-const wheelFL = createWheel();
-const wheelFR = createWheel();
-const wheelBL = createWheel();
-const wheelBR = createWheel();
+  window.addEventListener("keyup", (e) => {
+    if (keys.hasOwnProperty(e.key)) keys[e.key] = false;
+  });
 
-wheelFL.position.set(-2, -0.1, 1.4);
-wheelFR.position.set(2, -0.1, 1.4);
-wheelBL.position.set(-2, -0.1, -1.4);
-wheelBR.position.set(2, -0.1, -1.4);
+  // Fart og fysikk (veldig enkel)
+  let playerSpeed = 0;
+  const maxPlayerSpeed = 55;   // "ca. 200 km/t" i vår skala
+  const accel = 1.2;
+  const brake = 1.5;
+  const friction = 0.98;
+  const turnSpeed = 0.04;
 
-car.add(wheelFL, wheelFR, wheelBL, wheelBR);
+  const enemySpeed = 27; // "ca. 100 km/t" i vår skala
 
-car.position.set(0, 1, 0);
-scene.add(car);
-
-// INPUT
-const keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
-document.addEventListener("keydown", e => keys[e.key] = true);
-document.addEventListener("keyup", e => keys[e.key] = false);
-
-// BILFYSIKK
-let speed = 0;
-const maxSpeed = 2.5;
-const accel = 0.06;
-const friction = 0.02;
-const turnSpeed = 0.04;
-
-function updateCar() {
-    // Akselerasjon
-    if (keys.ArrowUp) speed += accel;
-    if (keys.ArrowDown) speed -= accel;
+  function updatePlayer(dt) {
+    // Akselerasjon / brems
+    if (keys.ArrowUp) {
+      playerSpeed += accel;
+    }
+    if (keys.ArrowDown) {
+      playerSpeed -= brake;
+    }
 
     // Begrens fart
-    speed = Math.max(Math.min(speed, maxSpeed), -maxSpeed / 2);
+    if (playerSpeed > maxPlayerSpeed) playerSpeed = maxPlayerSpeed;
+    if (playerSpeed < -maxPlayerSpeed / 2) playerSpeed = -maxPlayerSpeed / 2;
 
     // Friksjon
-    if (!keys.ArrowUp && !keys.ArrowDown) {
-        if (speed > 0) speed -= friction;
-        if (speed < 0) speed += friction;
-        if (Math.abs(speed) < 0.01) speed = 0;
-    }
+    playerSpeed *= friction;
 
     // Svinging
-    if (speed !== 0) {
-        if (keys.ArrowLeft) car.rotation.y += turnSpeed * (speed / maxSpeed);
-        if (keys.ArrowRight) car.rotation.y -= turnSpeed * (speed / maxSpeed);
+    if (keys.ArrowLeft) {
+      playerCar.rotation.y += turnSpeed * (playerSpeed >= 0 ? 1 : -1);
+    }
+    if (keys.ArrowRight) {
+      playerCar.rotation.y -= turnSpeed * (playerSpeed >= 0 ? 1 : -1);
     }
 
-    // Bevegelse (ingen sidelengs glidning)
-    const forward = new THREE.Vector3();
-    car.getWorldDirection(forward);
-    car.position.addScaledVector(forward, speed);
+    // Bevegelse
+    const forward = new THREE.Vector3(
+      Math.sin(playerCar.rotation.y),
+      0,
+      Math.cos(playerCar.rotation.y)
+    );
+    playerCar.position.addScaledVector(forward, playerSpeed * dt);
+  }
 
-    // Hjulrotasjon
-    const wheelSpin = speed * 5;
-    wheelFL.rotation.x -= wheelSpin;
-    wheelFR.rotation.x -= wheelSpin;
-    wheelBL.rotation.x -= wheelSpin;
-    wheelBR.rotation.x -= wheelSpin;
-}
+  function updateEnemy(dt) {
+    // Enkel AI: kjører rett fram langs z-aksen
+    enemyCar.position.z += enemySpeed * dt;
 
-// KAMERA
-function updateCamera() {
-    const offset = new THREE.Vector3(0, 5, 12);
-    offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), car.rotation.y);
+    // Hvis den kommer for langt, flytt den tilbake
+    if (enemyCar.position.z > 200) {
+      enemyCar.position.z = -200;
+    }
+  }
 
-    const camPos = car.position.clone().add(offset);
-    camera.position.lerp(camPos, 0.1);
-    camera.lookAt(car.position.clone().add(new THREE.Vector3(0, 1, 0)));
-}
+  // Kamera følger spilleren
+  function updateCamera() {
+    const offset = new THREE.Vector3(0, 8, -15);
+    const rotY = playerCar.rotation.y;
+    const rotatedOffset = new THREE.Vector3(
+      offset.x * Math.cos(rotY) - offset.z * Math.sin(rotY),
+      offset.y,
+      offset.x * Math.sin(rotY) + offset.z * Math.cos(rotY)
+    );
+    camera.position.copy(playerCar.position).add(rotatedOffset);
+    camera.lookAt(playerCar.position);
+  }
 
-// LOOP
-function animate() {
+  let lastTime = performance.now();
+
+  function animate() {
     requestAnimationFrame(animate);
-    updateCar();
+    const now = performance.now();
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
+
+    updatePlayer(dt);
+    updateEnemy(dt);
     updateCamera();
+
     renderer.render(scene, camera);
-}
+  }
 
-animate();
+  animate();
 
-// Resize
-window.addEventListener("resize", () => {
+  // Håndter vindusstørrelse
+  window.addEventListener("resize", () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
-});
+  });
 </script>
-
 </body>
 </html>
