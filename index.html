@@ -46,6 +46,7 @@ let pipeSpeed = 3;
 let score = 0;
 let started = false;
 let gameOver = false;
+let paused = false;
 
 // Reset
 function reset() {
@@ -55,6 +56,7 @@ function reset() {
   score = 0;
   started = false;
   gameOver = false;
+  paused = false;
 }
 
 // Lag rør
@@ -71,7 +73,7 @@ function addPipe() {
 // Oppdater spill
 let frame = 0;
 function update() {
-  if (!started || gameOver) return;
+  if (!started || gameOver || paused) return;
 
   bird.vel += bird.gravity;
   bird.y += bird.vel;
@@ -157,6 +159,11 @@ function drawText() {
     ctx.fillText("Trykk SPACE for å starte", 40, canvas.height / 2);
   }
 
+  if (paused) {
+    ctx.font = "40px Arial";
+    ctx.fillText("PAUSE", 150, canvas.height / 2);
+  }
+
   if (gameOver) {
     ctx.font = "40px Arial";
     ctx.fillText("GAME OVER", 110, canvas.height / 2 - 20);
@@ -182,9 +189,22 @@ function loop() {
 // Kontroller
 document.addEventListener("keydown", (e) => {
   if (e.code === "Space") {
-    if (!started) started = true;
-    if (gameOver) return reset();
-    bird.vel = bird.jump;
+    if (!started) {
+      started = true;
+      return;
+    }
+    if (gameOver) {
+      reset();
+      return;
+    }
+    if (!paused) {
+      bird.vel = bird.jump; // hopp
+    }
+  }
+
+  // Pause med P
+  if (e.code === "KeyP") {
+    paused = !paused;
   }
 });
 
