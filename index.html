@@ -1,200 +1,221 @@
 <!DOCTYPE html>
 <html lang="no">
 <head>
-  <meta charset="UTF-8" />
-  <title>Enkelt 3D bilspill</title>
-  <style>
-    body { margin: 0; overflow: hidden; background: #000; }
-    #info {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      color: white;
-      font-family: Arial, sans-serif;
-      font-size: 14px;
-      background: rgba(0,0,0,0.5);
-      padding: 8px 10px;
-      border-radius: 4px;
-    }
-  </style>
+<meta charset="UTF-8" />
+<title>Enkelt 3D bilspill</title>
+<style>
+   body { margin: 0; overflow: hidden; background: #000; }
+   #info {
+     position: absolute;
+     top: 10px;
+     left: 10px;
+     color: white;
+     font-family: Arial, sans-serif;
+     font-size: 14px;
+     background: rgba(0,0,0,0.5);
+     padding: 8px 10px;
+     border-radius: 4px;
+     pointer-events: none; /* Lar deg klikke gjennom teksten */
+   }
+</style>
 </head>
 <body>
 <div id="info">
-  Piltaster: styr bilen din<br>
-  Din bil: rask (ca. 200 km/t)<br>
-  Rød bil: saktere (ca. 100 km/t)
+Piltaster: Styr bilen<br>
+Opp: Gass<br>
+Ned: Brems / Rygg
 </div>
-
+ 
 <!-- Three.js fra CDN -->
 <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-
 <script>
-  // Grunnleggende Three.js-oppsett
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x87ceeb); // himmelblå
-
-  const camera = new THREE.PerspectiveCamera(
-    60,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    1000
-  );
-  camera.position.set(0, 10, -20);
-  camera.lookAt(0, 0, 0);
-
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  document.body.appendChild(renderer.domElement);
-
-  // Lys
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-  scene.add(ambientLight);
-
-  const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-  dirLight.position.set(10, 20, 10);
-  scene.add(dirLight);
-
-  // "By-gulv" (stor plane)
-  const groundGeo = new THREE.PlaneGeometry(500, 500);
-  const groundMat = new THREE.MeshPhongMaterial({ color: 0x444444 });
-  const ground = new THREE.Mesh(groundGeo, groundMat);
-  ground.rotation.x = -Math.PI / 2;
-  scene.add(ground);
-
-  // Enkle "hus" som bokser
-  function createBuilding(x, z, h) {
-    const geo = new THREE.BoxGeometry(5, h, 5);
-    const mat = new THREE.MeshPhongMaterial({ color: 0x888888 });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(x, h / 2, z);
-    scene.add(mesh);
-  }
-
-  for (let i = 0; i < 40; i++) {
-    const x = (Math.random() - 0.5) * 400;
-    const z = (Math.random() - 0.5) * 400;
-    const h = 5 + Math.random() * 25;
-    createBuilding(x, z, h);
-  }
-
-  // Din bil (blå boks)
-  const carGeo = new THREE.BoxGeometry(2, 1, 4);
-  const carMat = new THREE.MeshPhongMaterial({ color: 0x0000ff });
-  const playerCar = new THREE.Mesh(carGeo, carMat);
-  playerCar.position.set(0, 0.5, 0);
-  scene.add(playerCar);
-
-  // Motstanderbil (rød boks)
-  const enemyMat = new THREE.MeshPhongMaterial({ color: 0xff0000 });
-  const enemyCar = new THREE.Mesh(carGeo, enemyMat);
-  enemyCar.position.set(3, 0.5, -10);
-  scene.add(enemyCar);
-
-  // Kontrollvariabler
-  const keys = {
-    ArrowUp: false,
-    ArrowDown: false,
-    ArrowLeft: false,
-    ArrowRight: false
-  };
-
-  window.addEventListener("keydown", (e) => {
-    if (keys.hasOwnProperty(e.key)) keys[e.key] = true;
-  });
-
-  window.addEventListener("keyup", (e) => {
-    if (keys.hasOwnProperty(e.key)) keys[e.key] = false;
-  });
-
-  // Fart og fysikk (veldig enkel)
-  let playerSpeed = 0;
-  const maxPlayerSpeed = 55;   // "ca. 200 km/t" i vår skala
-  const accel = 1.2;
-  const brake = 1.5;
-  const friction = 0.98;
-  const turnSpeed = 0.04;
-
-  const enemySpeed = 27; // "ca. 100 km/t" i vår skala
-
-  function updatePlayer(dt) {
-    // Akselerasjon / brems
-    if (keys.ArrowUp) {
-      playerSpeed += accel;
-    }
-    if (keys.ArrowDown) {
-      playerSpeed -= brake;
-    }
-
-    // Begrens fart
-    if (playerSpeed > maxPlayerSpeed) playerSpeed = maxPlayerSpeed;
-    if (playerSpeed < -maxPlayerSpeed / 2) playerSpeed = -maxPlayerSpeed / 2;
-
-    // Friksjon
-    playerSpeed *= friction;
-
-    // Svinging
-    if (keys.ArrowLeft) {
-      playerCar.rotation.y += turnSpeed * (playerSpeed >= 0 ? 1 : -1);
-    }
-    if (keys.ArrowRight) {
-      playerCar.rotation.y -= turnSpeed * (playerSpeed >= 0 ? 1 : -1);
-    }
-
-    // Bevegelse
-    const forward = new THREE.Vector3(
-      Math.sin(playerCar.rotation.y),
-      0,
-      Math.cos(playerCar.rotation.y)
-    );
-    playerCar.position.addScaledVector(forward, playerSpeed * dt);
-  }
-
-  function updateEnemy(dt) {
-    // Enkel AI: kjører rett fram langs z-aksen
-    enemyCar.position.z += enemySpeed * dt;
-
-    // Hvis den kommer for langt, flytt den tilbake
-    if (enemyCar.position.z > 200) {
-      enemyCar.position.z = -200;
-    }
-  }
-
-  // Kamera følger spilleren
-  function updateCamera() {
-    const offset = new THREE.Vector3(0, 8, -15);
-    const rotY = playerCar.rotation.y;
-    const rotatedOffset = new THREE.Vector3(
-      offset.x * Math.cos(rotY) - offset.z * Math.sin(rotY),
-      offset.y,
-      offset.x * Math.sin(rotY) + offset.z * Math.cos(rotY)
-    );
-    camera.position.copy(playerCar.position).add(rotatedOffset);
-    camera.lookAt(playerCar.position);
-  }
-
-  let lastTime = performance.now();
-
-  function animate() {
-    requestAnimationFrame(animate);
-    const now = performance.now();
-    const dt = (now - lastTime) / 1000;
-    lastTime = now;
-
-    updatePlayer(dt);
-    updateEnemy(dt);
-    updateCamera();
-
-    renderer.render(scene, camera);
-  }
-
-  animate();
-
-  // Håndter vindusstørrelse
-  window.addEventListener("resize", () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  });
+// --- OPPSETT ---
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb); // Himmelblå
+ 
+const camera = new THREE.PerspectiveCamera(
+   60,
+   window.innerWidth / window.innerHeight,
+   0.1,
+   1000
+);
+ 
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+ 
+// Lys
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+scene.add(ambientLight);
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+dirLight.position.set(10, 20, 10);
+scene.add(dirLight);
+ 
+// "By-gulv"
+const groundGeo = new THREE.PlaneGeometry(500, 500);
+const groundMat = new THREE.MeshPhongMaterial({ color: 0x444444 });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+ 
+// --- OBJEKTER ---
+// Hjelpefunksjon for bygninger
+function createBuilding(x, z, h) {
+   const geo = new THREE.BoxGeometry(5, h, 5);
+   const mat = new THREE.MeshPhongMaterial({ color: 0x888888 });
+   const mesh = new THREE.Mesh(geo, mat);
+   mesh.position.set(x, h / 2, z);
+   scene.add(mesh);
+}
+// Lag noen tilfeldige bygninger
+for (let i = 0; i < 40; i++) {
+   const x = (Math.random() - 0.5) * 400;
+   const z = (Math.random() - 0.5) * 400;
+   const h = 5 + Math.random() * 25;
+   createBuilding(x, z, h);
+}
+ 
+// Din bil (blå boks)
+const carGeo = new THREE.BoxGeometry(2, 1, 4);
+const carMat = new THREE.MeshPhongMaterial({ color: 0x0000ff });
+const playerCar = new THREE.Mesh(carGeo, carMat);
+playerCar.position.set(0, 0.5, 0);
+scene.add(playerCar);
+ 
+// Motstanderbil (rød boks)
+const enemyMat = new THREE.MeshPhongMaterial({ color: 0xff0000 });
+const enemyCar = new THREE.Mesh(carGeo, enemyMat);
+enemyCar.position.set(3, 0.5, -10);
+scene.add(enemyCar);
+ 
+// --- STYRING ---
+const keys = {
+   ArrowUp: false,
+   ArrowDown: false,
+   ArrowLeft: false,
+   ArrowRight: false
+};
+ 
+window.addEventListener("keydown", (e) => {
+   if (keys.hasOwnProperty(e.key)) {
+     keys[e.key] = true;
+     e.preventDefault(); // Hindrer at nettsiden scroller når du spiller
+   }
+});
+ 
+window.addEventListener("keyup", (e) => {
+   if (keys.hasOwnProperty(e.key)) {
+     keys[e.key] = false;
+   }
+});
+ 
+// --- FYSIKK & LOGIKK ---
+let playerSpeed = 0;
+const maxPlayerSpeed = 60;
+const accel = 1.2;
+const brake = 1.5;
+const friction = 0.98;
+const turnSpeed = 0.05;
+ 
+const enemySpeed = 27;
+ 
+function updatePlayer(dt) {
+   // Akselerasjon / brems
+   if (keys.ArrowUp) {
+     playerSpeed += accel;
+   }
+   if (keys.ArrowDown) {
+     playerSpeed -= brake;
+   }
+ 
+   // Begrens fart
+   if (playerSpeed > maxPlayerSpeed) playerSpeed = maxPlayerSpeed;
+   if (playerSpeed < -maxPlayerSpeed / 2) playerSpeed = -maxPlayerSpeed / 2;
+ 
+   // Friksjon (bilen stopper sakte hvis man slipper gassen)
+   playerSpeed *= friction;
+ 
+   // Svinging (kun hvis bilen beveger seg litt)
+   if (Math.abs(playerSpeed) > 0.1) {
+       if (keys.ArrowLeft) {
+         // Snu motsatt vei hvis vi rygger for mer naturlig følelse
+         playerCar.rotation.y += turnSpeed * (playerSpeed > 0 ? 1 : -1);
+       }
+       if (keys.ArrowRight) {
+         playerCar.rotation.y -= turnSpeed * (playerSpeed > 0 ? 1 : -1);
+       }
+   }
+ 
+   // Beregn retning basert på rotasjon
+   // I dette oppsettet: 
+   // rotasjon 0 = Z-akse (mot deg/fra deg avhengig av kamera).
+   // Vi bruker standard matte: sin(y) for X, cos(y) for Z.
+   const forward = new THREE.Vector3(
+     Math.sin(playerCar.rotation.y),
+     0,
+     Math.cos(playerCar.rotation.y)
+   );
+ 
+   // Flytt bilen
+   playerCar.position.addScaledVector(forward, playerSpeed * dt);
+}
+ 
+function updateEnemy(dt) {
+   enemyCar.position.z += enemySpeed * dt;
+   if (enemyCar.position.z > 200) {
+     enemyCar.position.z = -200;
+   }
+}
+ 
+// Oppdatert kamera-funksjon som er mer stabil
+function updateCamera() {
+   // Finn ut hvilken vei bilen peker
+   const carForward = new THREE.Vector3(
+     Math.sin(playerCar.rotation.y),
+     0,
+     Math.cos(playerCar.rotation.y)
+   );
+ 
+   // Vi vil plassere kameraet BAK bilen.
+   // Posisjon = BilPosisjon - (Retning * avstand) + (Litt oppover)
+   const distanseBak = 15;
+   const hoydeOver = 8;
+ 
+   const cameraPos = playerCar.position.clone()
+     .addScaledVector(carForward, -distanseBak); 
+   
+   cameraPos.y += hoydeOver;
+ 
+   // Sett kameraets posisjon og få det til å se på bilen
+   camera.position.copy(cameraPos);
+   camera.lookAt(playerCar.position);
+}
+ 
+// --- LOOP ---
+let lastTime = performance.now();
+ 
+function animate() {
+   requestAnimationFrame(animate);
+   
+   const now = performance.now();
+   const dt = (now - lastTime) / 1000;
+   lastTime = now;
+ 
+   updatePlayer(dt);
+   updateEnemy(dt);
+   updateCamera();
+ 
+   renderer.render(scene, camera);
+}
+ 
+animate();
+ 
+// Håndter endring av vindusstørrelse
+window.addEventListener("resize", () => {
+   camera.aspect = window.innerWidth / window.innerHeight;
+   camera.updateProjectionMatrix();
+   renderer.setSize(window.innerWidth, window.innerHeight);
+});
 </script>
 </body>
 </html>
