@@ -1,221 +1,182 @@
 <!DOCTYPE html>
 <html lang="no">
 <head>
-<meta charset="UTF-8" />
-<title>Enkelt 3D bilspill</title>
-<style>
-   body { margin: 0; overflow: hidden; background: #000; }
-   #info {
-     position: absolute;
-     top: 10px;
-     left: 10px;
-     color: white;
-     font-family: Arial, sans-serif;
-     font-size: 14px;
-     background: rgba(0,0,0,0.5);
-     padding: 8px 10px;
-     border-radius: 4px;
-     pointer-events: none; /* Lar deg klikke gjennom teksten */
-   }
-</style>
+  <meta charset="UTF-8">
+  <title>Flappy Bird-kopi</title>
+  <style>
+    body { margin: 0; background: #222; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    canvas { background: #70c5ce; border: 3px solid #000; }
+  </style>
 </head>
 <body>
-<div id="info">
-Piltaster: Styr bilen<br>
-Opp: Gass<br>
-Ned: Brems / Rygg
-</div>
- 
-<!-- Three.js fra CDN -->
-<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<canvas id="game" width="400" height="600"></canvas>
+
 <script>
-// --- OPPSETT ---
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87ceeb); // Himmelblå
- 
-const camera = new THREE.PerspectiveCamera(
-   60,
-   window.innerWidth / window.innerHeight,
-   0.1,
-   1000
-);
- 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
- 
-// Lys
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-scene.add(ambientLight);
-const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-dirLight.position.set(10, 20, 10);
-scene.add(dirLight);
- 
-// "By-gulv"
-const groundGeo = new THREE.PlaneGeometry(500, 500);
-const groundMat = new THREE.MeshPhongMaterial({ color: 0x444444 });
-const ground = new THREE.Mesh(groundGeo, groundMat);
-ground.rotation.x = -Math.PI / 2;
-scene.add(ground);
- 
-// --- OBJEKTER ---
-// Hjelpefunksjon for bygninger
-function createBuilding(x, z, h) {
-   const geo = new THREE.BoxGeometry(5, h, 5);
-   const mat = new THREE.MeshPhongMaterial({ color: 0x888888 });
-   const mesh = new THREE.Mesh(geo, mat);
-   mesh.position.set(x, h / 2, z);
-   scene.add(mesh);
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+let birdX = 80;
+let birdY = canvas.height / 2;
+let birdR = 15;
+let birdVel = 0;
+let gravity = 0.5;
+let jump = -8;
+
+let pipes = [];
+let pipeWidth = 60;
+let pipeGap = 140;
+let pipeSpeed = 2.5;
+let frame = 0;
+let score = 0;
+let gameOver = false;
+let started = false;
+
+function resetGame() {
+  birdX = 80;
+  birdY = canvas.height / 2;
+  birdVel = 0;
+  pipes = [];
+  frame = 0;
+  score = 0;
+  gameOver = false;
+  started = false;
 }
-// Lag noen tilfeldige bygninger
-for (let i = 0; i < 40; i++) {
-   const x = (Math.random() - 0.5) * 400;
-   const z = (Math.random() - 0.5) * 400;
-   const h = 5 + Math.random() * 25;
-   createBuilding(x, z, h);
+
+function addPipe() {
+  const topHeight = 50 + Math.random() * 250;
+  pipes.push({
+    x: canvas.width,
+    top: topHeight,
+    bottom: topHeight + pipeGap,
+    passed: false
+  });
 }
- 
-// Din bil (blå boks)
-const carGeo = new THREE.BoxGeometry(2, 1, 4);
-const carMat = new THREE.MeshPhongMaterial({ color: 0x0000ff });
-const playerCar = new THREE.Mesh(carGeo, carMat);
-playerCar.position.set(0, 0.5, 0);
-scene.add(playerCar);
- 
-// Motstanderbil (rød boks)
-const enemyMat = new THREE.MeshPhongMaterial({ color: 0xff0000 });
-const enemyCar = new THREE.Mesh(carGeo, enemyMat);
-enemyCar.position.set(3, 0.5, -10);
-scene.add(enemyCar);
- 
-// --- STYRING ---
-const keys = {
-   ArrowUp: false,
-   ArrowDown: false,
-   ArrowLeft: false,
-   ArrowRight: false
-};
- 
-window.addEventListener("keydown", (e) => {
-   if (keys.hasOwnProperty(e.key)) {
-     keys[e.key] = true;
-     e.preventDefault(); // Hindrer at nettsiden scroller når du spiller
-   }
+
+function update() {
+  if (!started || gameOver) return;
+
+  birdVel += gravity;
+  birdY += birdVel;
+
+  // Legg til nye rør
+  frame++;
+  if (frame % 90 === 0) {
+    addPipe();
+  }
+
+  // Oppdater rør
+  for (let i = pipes.length - 1; i >= 0; i--) {
+    pipes[i].x -= pipeSpeed;
+
+    // Sjekk om fuglen passerer røret (score)
+    if (!pipes[i].passed && pipes[i].x + pipeWidth < birdX) {
+      pipes[i].passed = true;
+      score++;
+    }
+
+    // Fjern rør som er ute av skjermen
+    if (pipes[i].x + pipeWidth < 0) {
+      pipes.splice(i, 1);
+    }
+  }
+
+  // Kollisjon med bakken eller tak
+  if (birdY + birdR > canvas.height || birdY - birdR < 0) {
+    gameOver = true;
+  }
+
+  // Kollisjon med rør
+  for (const p of pipes) {
+    if (
+      birdX + birdR > p.x &&
+      birdX - birdR < p.x + pipeWidth &&
+      (birdY - birdR < p.top || birdY + birdR > p.bottom)
+    ) {
+      gameOver = true;
+    }
+  }
+}
+
+function drawBird() {
+  ctx.fillStyle = "#ffeb3b";
+  ctx.beginPath();
+  ctx.arc(birdX, birdY, birdR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // lite øye
+  ctx.fillStyle = "#000";
+  ctx.beginPath();
+  ctx.arc(birdX + 5, birdY - 5, 3, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawPipes() {
+  ctx.fillStyle = "#4caf50";
+  for (const p of pipes) {
+    // topp-rør
+    ctx.fillRect(p.x, 0, pipeWidth, p.top);
+    // bunn-rør
+    ctx.fillRect(p.x, p.bottom, pipeWidth, canvas.height - p.bottom);
+  }
+}
+
+function drawText() {
+  ctx.fillStyle = "#fff";
+  ctx.font = "28px Arial";
+  ctx.fillText("Score: " + score, 10, 40);
+
+  if (!started && !gameOver) {
+    ctx.font = "24px Arial";
+    ctx.fillText("Trykk SPACE for å starte", 40, canvas.height / 2);
+  }
+
+  if (gameOver) {
+    ctx.font = "32px Arial";
+    ctx.fillText("GAME OVER", 110, canvas.height / 2 - 20);
+    ctx.font = "20px Arial";
+    ctx.fillText("Score: " + score, 160, canvas.height / 2 + 10);
+    ctx.fillText("Trykk SPACE for å restarte", 80, canvas.height / 2 + 40);
+  }
+}
+
+function drawBackground() {
+  // enkel bakke
+  ctx.fillStyle = "#70c5ce";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "#ded895";
+  ctx.fillRect(0, canvas.height - 60, canvas.width, 60);
+
+  ctx.fillStyle = "#4caf50";
+  ctx.fillRect(0, canvas.height - 70, canvas.width, 10);
+}
+
+function loop() {
+  update();
+
+  drawBackground();
+  drawPipes();
+  drawBird();
+  drawText();
+
+  requestAnimationFrame(loop);
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.code === "Space") {
+    if (!started) {
+      started = true;
+    }
+    if (gameOver) {
+      resetGame();
+      return;
+    }
+    birdVel = jump;
+  }
 });
- 
-window.addEventListener("keyup", (e) => {
-   if (keys.hasOwnProperty(e.key)) {
-     keys[e.key] = false;
-   }
-});
- 
-// --- FYSIKK & LOGIKK ---
-let playerSpeed = 0;
-const maxPlayerSpeed = 60;
-const accel = 1.2;
-const brake = 1.5;
-const friction = 0.98;
-const turnSpeed = 0.05;
- 
-const enemySpeed = 27;
- 
-function updatePlayer(dt) {
-   // Akselerasjon / brems
-   if (keys.ArrowUp) {
-     playerSpeed += accel;
-   }
-   if (keys.ArrowDown) {
-     playerSpeed -= brake;
-   }
- 
-   // Begrens fart
-   if (playerSpeed > maxPlayerSpeed) playerSpeed = maxPlayerSpeed;
-   if (playerSpeed < -maxPlayerSpeed / 2) playerSpeed = -maxPlayerSpeed / 2;
- 
-   // Friksjon (bilen stopper sakte hvis man slipper gassen)
-   playerSpeed *= friction;
- 
-   // Svinging (kun hvis bilen beveger seg litt)
-   if (Math.abs(playerSpeed) > 0.1) {
-       if (keys.ArrowLeft) {
-         // Snu motsatt vei hvis vi rygger for mer naturlig følelse
-         playerCar.rotation.y += turnSpeed * (playerSpeed > 0 ? 1 : -1);
-       }
-       if (keys.ArrowRight) {
-         playerCar.rotation.y -= turnSpeed * (playerSpeed > 0 ? 1 : -1);
-       }
-   }
- 
-   // Beregn retning basert på rotasjon
-   // I dette oppsettet: 
-   // rotasjon 0 = Z-akse (mot deg/fra deg avhengig av kamera).
-   // Vi bruker standard matte: sin(y) for X, cos(y) for Z.
-   const forward = new THREE.Vector3(
-     Math.sin(playerCar.rotation.y),
-     0,
-     Math.cos(playerCar.rotation.y)
-   );
- 
-   // Flytt bilen
-   playerCar.position.addScaledVector(forward, playerSpeed * dt);
-}
- 
-function updateEnemy(dt) {
-   enemyCar.position.z += enemySpeed * dt;
-   if (enemyCar.position.z > 200) {
-     enemyCar.position.z = -200;
-   }
-}
- 
-// Oppdatert kamera-funksjon som er mer stabil
-function updateCamera() {
-   // Finn ut hvilken vei bilen peker
-   const carForward = new THREE.Vector3(
-     Math.sin(playerCar.rotation.y),
-     0,
-     Math.cos(playerCar.rotation.y)
-   );
- 
-   // Vi vil plassere kameraet BAK bilen.
-   // Posisjon = BilPosisjon - (Retning * avstand) + (Litt oppover)
-   const distanseBak = 15;
-   const hoydeOver = 8;
- 
-   const cameraPos = playerCar.position.clone()
-     .addScaledVector(carForward, -distanseBak); 
-   
-   cameraPos.y += hoydeOver;
- 
-   // Sett kameraets posisjon og få det til å se på bilen
-   camera.position.copy(cameraPos);
-   camera.lookAt(playerCar.position);
-}
- 
-// --- LOOP ---
-let lastTime = performance.now();
- 
-function animate() {
-   requestAnimationFrame(animate);
-   
-   const now = performance.now();
-   const dt = (now - lastTime) / 1000;
-   lastTime = now;
- 
-   updatePlayer(dt);
-   updateEnemy(dt);
-   updateCamera();
- 
-   renderer.render(scene, camera);
-}
- 
-animate();
- 
-// Håndter endring av vindusstørrelse
-window.addEventListener("resize", () => {
-   camera.aspect = window.innerWidth / window.innerHeight;
-   camera.updateProjectionMatrix();
-   renderer.setSize(window.innerWidth, window.innerHeight);
-});
+
+resetGame();
+loop();
 </script>
 </body>
 </html>
