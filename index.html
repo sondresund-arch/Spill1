@@ -26,7 +26,7 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-// Fuglen
+// Fuglen (rotasjonen er låst)
 let bird = {
   x: 100,
   y: canvas.height / 2,
@@ -83,13 +83,11 @@ function update() {
   for (let i = pipes.length - 1; i >= 0; i--) {
     pipes[i].x -= pipeSpeed;
 
-    // Score
     if (!pipes[i].passed && pipes[i].x + pipeWidth < bird.x) {
       pipes[i].passed = true;
       score++;
     }
 
-    // Fjern rør
     if (pipes[i].x + pipeWidth < 0) pipes.splice(i, 1);
   }
 
@@ -110,14 +108,13 @@ function update() {
   }
 }
 
-// Tegn fugl
+// Tegn fugl (ingen rotasjon)
 function drawBird() {
   ctx.fillStyle = "#ffeb3b";
   ctx.beginPath();
   ctx.arc(bird.x, bird.y, bird.r, 0, Math.PI * 2);
   ctx.fill();
 
-  // Øye
   ctx.fillStyle = "#000";
   ctx.beginPath();
   ctx.arc(bird.x + 6, bird.y - 5, 3, 0, Math.PI * 2);
@@ -131,7 +128,6 @@ function drawPipes() {
     ctx.fillRect(p.x, 0, pipeWidth, p.top);
     ctx.fillRect(p.x, p.bottom, pipeWidth, canvas.height - p.bottom);
 
-    // Skygge
     ctx.fillStyle = "rgba(0,0,0,0.2)";
     ctx.fillRect(p.x + pipeWidth - 5, 0, 5, p.top);
     ctx.fillRect(p.x + pipeWidth - 5, p.bottom, 5, canvas.height - p.bottom);
@@ -143,7 +139,6 @@ function drawBackground() {
   ctx.fillStyle = "#6ec9ff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Bakke
   ctx.fillStyle = "#d9c27a";
   ctx.fillRect(0, canvas.height - 60, canvas.width, 60);
 
